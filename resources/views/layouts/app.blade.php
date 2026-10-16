@@ -43,7 +43,10 @@
                         <a href="{{ route('payment-types.index') }}" class="flex items-center gap-3 rounded-xl px-4 py-3 {{ request()->routeIs('payment-types.*') ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">Jenis Pembayaran</a>
                         <a href="{{ route('bills.index') }}" class="flex items-center gap-3 rounded-xl px-4 py-3 {{ request()->routeIs('bills.*') ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">Tagihan</a>
                     @endhasanyrole
-                    <a href="#" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-400 hover:bg-white/5 hover:text-white">Pembayaran</a>
+                    @hasanyrole('admin_sekolah|bendahara')
+                        <a href="{{ route('payments.index') }}" class="flex items-center gap-3 rounded-xl px-4 py-3 {{ request()->routeIs('payments.*') ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">Riwayat Pembayaran</a>
+                        <a href="{{ route('receipt-templates.index') }}" class="flex items-center gap-3 rounded-xl px-4 py-3 {{ request()->routeIs('receipt-templates.*') ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">Template Struk</a>
+                    @endhasanyrole
                     <a href="#" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-400 hover:bg-white/5 hover:text-white">Kas Keuangan</a>
                     <a href="#" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-400 hover:bg-white/5 hover:text-white">Laporan</a>
                     <a href="#" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-400 hover:bg-white/5 hover:text-white">Pengaturan</a>

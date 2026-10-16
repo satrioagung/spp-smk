@@ -38,6 +38,16 @@ class Bill extends Model
         return $this->belongsTo(PaymentType::class);
     }
 
+    public function payments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function groupedPayments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Payment::class, 'payment_bill')->withPivot('nominal_bayar')->withTimestamps();
+    }
+
     public function scopeForInstitution(Builder $query, int $institutionId): Builder
     {
         return $query->where('institution_id', $institutionId);

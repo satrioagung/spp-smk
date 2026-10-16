@@ -4,7 +4,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\ClassController;
 use App\Http\Controllers\InstitutionController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentTypeController;
+use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SchoolYearController;
 use App\Http\Controllers\StudentController;
@@ -32,6 +34,10 @@ Route::middleware(['auth', 'set.tenant', 'role:super_admin|admin_sekolah|bendaha
     Route::post('bills/preview', [BillController::class, 'preview'])->name('bills.preview');
     Route::resource('payment-types', PaymentTypeController::class);
     Route::resource('bills', BillController::class)->only(['index', 'show', 'destroy']);
+    Route::get('payments/{payment}/struk', [PaymentController::class, 'cetakStruk'])->name('payments.struk');
+    Route::resource('payments', PaymentController::class)->except(['edit', 'update']);
+    Route::get('receipt-templates/{template}/preview', [ReceiptTemplateController::class, 'preview'])->name('receipt-templates.preview');
+    Route::resource('receipt-templates', ReceiptTemplateController::class);
 
     Route::get('students/export', [StudentController::class, 'export'])->name('students.export');
     Route::get('students/template', [StudentController::class, 'downloadTemplate'])->name('students.template');

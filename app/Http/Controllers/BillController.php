@@ -5,14 +5,16 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BillGenerateRequest;
 use App\Models\Bill;
 use App\Models\PaymentType;
+use App\Models\Payment;
 use App\Models\SchoolClass;
 use App\Models\SchoolYear;
 use App\Models\Student;
 use App\Services\BillGeneratorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class BillController extends Controller
@@ -45,8 +47,10 @@ class BillController extends Controller
             'tunggakan' => $summaryBills->sum(fn (Bill $bill) => $bill->sisa_tagihan),
         ];
 
+        $groupedBills = $this->groupForDisplay($query->get());
+
         return view('bills.index', [
-            'bills' => $query->paginate(20)->withQueryString(),
+            'bills' => $this->paginateGroups($groupedBills),
             'summary' => $summary,
             'schoolYears' => SchoolYear::where('institution_id', $institutionId)->orderByDesc('tanggal_mulai')->get(),
             'classes' => SchoolClass::where('institution_id', $institutionId)->orderBy('nama_kelas')->get(),
@@ -88,7 +92,12 @@ class BillController extends Controller
         $bill->load(['student.schoolClass', 'paymentType', 'schoolYear']);
         $paymentHistory = collect();
         if (Schema::hasTable('payments') && Schema::hasColumn('payments', 'bill_id')) {
-            $paymentHistory = DB::table('payments')->where('bill_id', $bill->id)->latest()->get();
+            $paymentHistory = Payment::with('bills')->where('institution_id', $bill->institution_id)
+                ->where(function ($query) use ($bill): void {
+                    $query->where('bill_id', $bill->id)->orWhereHas('bills', fn ($billQuery) => $billQuery->whereKey($bill->id));
+                })
+                ->latest()
+                ->get();
         }
         return view('bills.show', compact('bill', 'paymentHistory'));
     }
@@ -125,5 +134,51 @@ class BillController extends Controller
     private function ensureTenant(Request $request, Bill $bill): void
     {
         abort_unless((int) $bill->institution_id === $this->activeInstitutionId($request), 403, 'Anda tidak memiliki akses ke tagihan ini.');
+    }
+
+    private function groupForDisplay(Collection $bills): Collection
+    {
+        return $bills
+            ->groupBy(function (Bill $bill): string {
+                return $bill->paymentType?->tipe?->value === 'bulanan'
+                    ? "monthly-{$bill->student_id}-{$bill->payment_type_id}-{$bill->tahun}"
+                    : "bill-{$bill->id}";
+            })
+            ->map(function (Collection $items): Bill {
+                /** @var Bill $row */
+                $row = $items->first();
+                $row->setRelation('groupBills', $items->sortBy(fn (Bill $bill): int => (int) ($bill->bulan ?? 99))->values());
+                // Tombol Bayar hanya boleh membawa tagihan yang masih memiliki sisa.
+                // Bulan yang sudah lunas tetap ikut dihitung di ringkasan grup, tetapi
+                // tidak boleh dikirim ulang ke form pembayaran.
+                $row->setAttribute('group_bill_ids', $items->filter(fn (Bill $bill): bool => in_array($bill->status, ['belum_bayar', 'sebagian'], true) && $bill->sisa_tagihan > 0)->pluck('id')->values()->all());
+
+                if ($row->paymentType?->tipe?->value === 'bulanan') {
+                    $row->nominal = $items->sum(fn (Bill $bill): float => (float) $bill->nominal);
+                    $row->nominal_terbayar = $items->sum(fn (Bill $bill): float => (float) $bill->nominal_terbayar);
+                    $row->updateStatus();
+                    $row->setAttribute('period_label', $items->map(function (Bill $bill): string {
+                        return $bill->bulan ? \Carbon\Carbon::create()->month($bill->bulan)->translatedFormat('F').' '.$bill->tahun : (string) $bill->tahun;
+                    })->join(', '));
+                } else {
+                    $row->setAttribute('period_label', $row->bulan ? \Carbon\Carbon::create()->month($row->bulan)->translatedFormat('F').' '.$row->tahun : (string) $row->tahun);
+                }
+
+                return $row;
+            })
+            ->sortByDesc('id')
+            ->values();
+    }
+
+    private function paginateGroups(Collection $groups): LengthAwarePaginator
+    {
+        $perPage = 20;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $paginator = new LengthAwarePaginator($groups->forPage($page, $perPage)->values(), $groups->count(), $perPage, $page, [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ]);
+
+        return $paginator;
     }
 }

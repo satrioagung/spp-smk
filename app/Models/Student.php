@@ -54,4 +54,9 @@ class Student extends Model
     {
         return $this->hasMany(Bill::class);
     }
+
+    public function payments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
 }
