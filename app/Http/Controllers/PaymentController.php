@@ -12,7 +12,10 @@ use App\Services\PaymentService;
 use App\Services\ReceiptService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PaymentController extends Controller
@@ -104,12 +107,61 @@ class PaymentController extends Controller
         return to_route('payments.index')->with('success', 'Pembayaran dihapus dan status tagihan dikembalikan.');
     }
 
-    public function cetakStruk(Request $request, Payment $payment): mixed
+    public function cetakStruk(Request $request, Payment $payment): View
+    {
+        $this->ensureTenant($request, $payment);
+        $template = ReceiptTemplate::active()->where('institution_id', $payment->institution_id)->latest()->first();
+        $token = Str::random(64);
+        Cache::put('thermer-print:'.$token, ['payment_id' => $payment->id, 'template_id' => $template?->id], now()->addMinutes(5));
+        $baseUrl = $request->getSchemeAndHttpHost();
+        $androidResponseUrl = $baseUrl.route('payments.thermer.response', ['payment' => $payment, 'token' => $token], false);
+        $iosResponseUrl = $baseUrl.route('payments.thermer.response.ios', ['payment' => $payment, 'token' => $token], false);
+        $androidThermerUrl = 'my.bluetoothprint.scheme://'.$androidResponseUrl;
+        $iosThermerUrl = 'bprint://'.$iosResponseUrl;
+
+        return $this->receiptService->print($payment, $template, $androidThermerUrl, $iosThermerUrl);
+    }
+
+    public function thermerResponse(Request $request, Payment $payment): JsonResponse
+    {
+        return $this->thermerJsonResponse($request, $payment, false);
+    }
+
+    public function thermerResponseIos(Request $request, Payment $payment): JsonResponse
+    {
+        return $this->thermerJsonResponse($request, $payment, true);
+    }
+
+    private function thermerJsonResponse(Request $request, Payment $payment, bool $ios): JsonResponse
+    {
+        $token = (string) $request->query('token');
+        $payload = Cache::get('thermer-print:'.$token);
+        abort_unless(is_array($payload) && (int) ($payload['payment_id'] ?? 0) === (int) $payment->id, 403, 'Tautan cetak tidak valid atau sudah kedaluwarsa.');
+        $template = ! empty($payload['template_id']) ? ReceiptTemplate::find($payload['template_id']) : null;
+        $items = $this->receiptService->thermerPayload($payment, $request->getSchemeAndHttpHost(), $template);
+
+        // Thermer mengharuskan root JSON berupa object numerik, bukan array JSON.
+        // Setara dengan json_encode($payload, JSON_FORCE_OBJECT).
+        // iOS mengurutkan key sebagai teks, jadi 10 terbaca sebelum 2. Key
+        // ber-padding menjaga urutan 000, 001, 002, dan seterusnya.
+        if ($ios) {
+            $items = array_combine(
+                array_map(fn (int $index): string => str_pad((string) $index, 4, '0', STR_PAD_LEFT), array_keys($items)),
+                array_values($items),
+            );
+
+            return response()->json($items);
+        }
+
+        return response()->json((object) $items);
+    }
+
+    public function cetakStrukPdf(Request $request, Payment $payment): mixed
     {
         $this->ensureTenant($request, $payment);
         $template = ReceiptTemplate::active()->where('institution_id', $payment->institution_id)->latest()->first();
         $filename = preg_replace('/[^A-Za-z0-9._-]+/', '-', 'struk-'.$payment->nomor_transaksi) ?: 'struk-pembayaran';
-        return $this->receiptService->generate($payment, $template)->download($filename.'.pdf');
+        return $this->receiptService->generate($payment, $template)->stream($filename.'.pdf');
     }
 
     private function ensureTenant(Request $request, Payment $payment): void

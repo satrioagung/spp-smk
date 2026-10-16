@@ -16,6 +16,12 @@ Route::get('/', function () {
     return view('auth.login');
 });
 
+// Endpoint JSON sementara yang dipanggil aplikasi Thermer Android.
+Route::get('payments/{payment}/thermer-response', [PaymentController::class, 'thermerResponse'])
+    ->name('payments.thermer.response');
+Route::get('payments/{payment}/thermer-response/ios', [PaymentController::class, 'thermerResponseIos'])
+    ->name('payments.thermer.response.ios');
+
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'set.tenant'])
     ->name('dashboard');
@@ -34,6 +40,7 @@ Route::middleware(['auth', 'set.tenant', 'role:super_admin|admin_sekolah|bendaha
     Route::post('bills/preview', [BillController::class, 'preview'])->name('bills.preview');
     Route::resource('payment-types', PaymentTypeController::class);
     Route::resource('bills', BillController::class)->only(['index', 'show', 'destroy']);
+    Route::get('payments/{payment}/struk/pdf', [PaymentController::class, 'cetakStrukPdf'])->name('payments.struk.pdf');
     Route::get('payments/{payment}/struk', [PaymentController::class, 'cetakStruk'])->name('payments.struk');
     Route::resource('payments', PaymentController::class)->except(['edit', 'update']);
     Route::get('receipt-templates/{template}/preview', [ReceiptTemplateController::class, 'preview'])->name('receipt-templates.preview');

@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <title>{{ $payment->nomor_transaksi }}</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; width: 100%; margin: 0; color: #111; }
-        .receipt { text-align: center; padding: 10px; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 11px; width: 100%; margin: 0; color: #111; }
+        .receipt { text-align: center; padding: 9px; }
         .logo { max-width: 45px; max-height: 45px; }
         .line { border-top: 1px dashed #333; margin: 10px 0; }
-        .row { display: flex; justify-content: space-between; text-align: left; margin: 6px 0; }
-        .amount { font-size: 14px; font-weight: bold; text-align: right; margin-top: 12px; }
+        .row { display: flex; justify-content: space-between; text-align: left; margin: 7px 0; }
+        .amount { font-size: 16px; font-weight: bold; text-align: right; margin-top: 14px; }
         .footer { margin-top: 18px; white-space: normal; }
     </style>
 </head>

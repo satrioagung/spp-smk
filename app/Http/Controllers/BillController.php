@@ -139,30 +139,19 @@ class BillController extends Controller
     private function groupForDisplay(Collection $bills): Collection
     {
         return $bills
-            ->groupBy(function (Bill $bill): string {
-                return $bill->paymentType?->tipe?->value === 'bulanan'
-                    ? "monthly-{$bill->student_id}-{$bill->payment_type_id}-{$bill->tahun}"
-                    : "bill-{$bill->id}";
-            })
+            ->groupBy('student_id')
             ->map(function (Collection $items): Bill {
                 /** @var Bill $row */
                 $row = $items->first();
-                $row->setRelation('groupBills', $items->sortBy(fn (Bill $bill): int => (int) ($bill->bulan ?? 99))->values());
-                // Tombol Bayar hanya boleh membawa tagihan yang masih memiliki sisa.
-                // Bulan yang sudah lunas tetap ikut dihitung di ringkasan grup, tetapi
-                // tidak boleh dikirim ulang ke form pembayaran.
-                $row->setAttribute('group_bill_ids', $items->filter(fn (Bill $bill): bool => in_array($bill->status, ['belum_bayar', 'sebagian'], true) && $bill->sisa_tagihan > 0)->pluck('id')->values()->all());
-
-                if ($row->paymentType?->tipe?->value === 'bulanan') {
-                    $row->nominal = $items->sum(fn (Bill $bill): float => (float) $bill->nominal);
-                    $row->nominal_terbayar = $items->sum(fn (Bill $bill): float => (float) $bill->nominal_terbayar);
-                    $row->updateStatus();
-                    $row->setAttribute('period_label', $items->map(function (Bill $bill): string {
-                        return $bill->bulan ? \Carbon\Carbon::create()->month($bill->bulan)->translatedFormat('F').' '.$bill->tahun : (string) $bill->tahun;
-                    })->join(', '));
-                } else {
-                    $row->setAttribute('period_label', $row->bulan ? \Carbon\Carbon::create()->month($row->bulan)->translatedFormat('F').' '.$row->tahun : (string) $row->tahun);
-                }
+                $studentBills = $items->sortBy(fn (Bill $bill): string => sprintf('%s-%04d-%02d-%08d', $bill->paymentType?->nama ?: '', (int) $bill->tahun, (int) ($bill->bulan ?? 99), (int) $bill->id))->values();
+                $row->setRelation('studentBills', $studentBills);
+                $row->setAttribute('student_bill_ids', $studentBills->filter(fn (Bill $bill): bool => in_array($bill->status, ['belum_bayar', 'sebagian'], true) && $bill->sisa_tagihan > 0)->pluck('id')->values()->all());
+                $row->setAttribute('student_total_nominal', $studentBills->sum(fn (Bill $bill): float => (float) $bill->nominal));
+                $row->setAttribute('student_total_paid', $studentBills->sum(fn (Bill $bill): float => (float) $bill->nominal_terbayar));
+                $row->setAttribute('student_total_due', $studentBills->sum(fn (Bill $bill): float => $bill->sisa_tagihan));
+                $row->setAttribute('student_status', $studentBills->every(fn (Bill $bill): bool => $bill->status === 'lunas')
+                    ? 'lunas'
+                    : ($studentBills->contains(fn (Bill $bill): bool => (float) $bill->nominal_terbayar > 0) ? 'sebagian' : 'belum_bayar'));
 
                 return $row;
             })

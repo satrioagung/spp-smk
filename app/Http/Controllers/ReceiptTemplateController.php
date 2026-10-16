@@ -76,4 +76,5 @@ class ReceiptTemplateController extends Controller
     {
         abort_unless((int) $template->institution_id === $this->activeInstitutionId($request), 403, 'Anda tidak memiliki akses ke template ini.');
     }
+
 }

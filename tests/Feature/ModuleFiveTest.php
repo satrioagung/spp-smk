@@ -11,6 +11,8 @@ use App\Models\Student;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ModuleFiveTest extends TestCase
@@ -57,7 +59,7 @@ class ModuleFiveTest extends TestCase
         $this->assertSame(0.0, (float) $bill->nominal_terbayar);
     }
 
-    public function test_payment_detail_history_and_receipt_pdf_are_available(): void
+    public function test_payment_detail_and_print_receipt_are_available(): void
     {
         ['user' => $user, 'bill' => $bill] = $this->paymentFixture();
         $this->actingAs($user)->post(route('payments.store'), ['bill_id' => $bill->id, 'tanggal_bayar' => '2025-01-10', 'metode_bayar' => 'tunai', 'nominal_bayar' => 200000]);
@@ -65,7 +67,32 @@ class ModuleFiveTest extends TestCase
         $this->actingAs($user)->get(route('payments.index', ['tanggal_mulai' => '2025-01-01', 'tanggal_selesai' => '2025-01-31']))->assertOk()->assertSee($payment->nomor_transaksi)->assertSee('Siswa Pembayaran');
         $this->actingAs($user)->get(route('payments.show', $payment))->assertOk()->assertSee('Cetak Struk');
         $response = $this->actingAs($user)->get(route('payments.struk', $payment));
-        $response->assertOk()->assertHeader('content-type', 'application/pdf');
+        $response->assertOk()
+            ->assertSee('window.print')
+            ->assertSee('>PDF<', false)
+            ->assertSee('Cetak Android')
+            ->assertSee('Cetak iOS')
+            ->assertSee('my.bluetoothprint.scheme://')
+            ->assertSee('bprint://');
+        $this->actingAs($user)->get(route('payments.struk.pdf', $payment))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $token = Str::random(32);
+        Cache::put('thermer-print:'.$token, ['payment_id' => $payment->id], now()->addMinutes(5));
+        $thermerResponse = $this->get(route('payments.thermer.response', ['payment' => $payment, 'token' => $token]));
+        $thermerResponse->assertOk()->assertHeader('content-type', 'application/json');
+        $this->assertStringStartsWith('{', trim($thermerResponse->getContent()));
+        $this->assertStringContainsString('"0":', $thermerResponse->getContent());
+        $this->assertStringContainsString('Metode: Tunai', $thermerResponse->getContent());
+        $this->assertStringContainsString('Rp 200.000', $thermerResponse->getContent());
+        $this->assertStringContainsString('"align":2', $thermerResponse->getContent());
+        $iosThermerResponse = $this->get(route('payments.thermer.response.ios', ['payment' => $payment, 'token' => $token]));
+        $iosThermerResponse->assertOk()->assertHeader('content-type', 'application/json');
+        $this->assertStringStartsWith('{', trim($iosThermerResponse->getContent()));
+        $this->assertStringContainsString('"0000":', $iosThermerResponse->getContent());
+        $iosItems = array_keys(json_decode($iosThermerResponse->getContent(), true, 512, JSON_THROW_ON_ERROR));
+        $this->assertSame($iosItems, array_map(fn (int $index): string => str_pad((string) $index, 4, '0', STR_PAD_LEFT), range(0, count($iosItems) - 1)));
     }
 
     public function test_one_payment_can_cover_multiple_months_and_payment_types(): void
@@ -158,7 +185,10 @@ class ModuleFiveTest extends TestCase
 
         $this->actingAs($user)->get(route('bills.index'))
             ->assertOk()
-            ->assertSee(route('payments.create', ['bill_ids' => [$february->id]]), false)
-            ->assertDontSee(route('payments.create', ['bill_ids' => [$january->id, $february->id]]), false);
+            ->assertSee('Pilih tagihan')
+            ->assertSee('Februari')
+            ->assertSee('value="'.$february->id.'"', false)
+            ->assertSee('value="'.$january->id.'"', false)
+            ->assertSee('disabled', false);
     }
 }

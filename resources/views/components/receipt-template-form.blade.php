@@ -1,5 +1,80 @@
-@php($isEdit = $isEdit ?? false)
-<form method="POST" action="{{ $formAction }}" class="space-y-8">@csrf @if($isEdit) @method('PUT') @endif
-    <div class="grid gap-6 md:grid-cols-2"><div><label for="nama_template" class="block text-sm font-medium text-slate-700">Nama Template <span class="text-red-500">*</span></label><input id="nama_template" name="nama_template" value="{{ old('nama_template', $template->nama_template ?? 'Template Default A4') }}" maxlength="100" required class="mt-2 block w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"><x-input-error :messages="$errors->get('nama_template')" class="mt-2" /></div><div><label for="ukuran" class="block text-sm font-medium text-slate-700">Ukuran <span class="text-red-500">*</span></label><select id="ukuran" name="ukuran" required class="mt-2 block w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"><option value="a4" @selected(old('ukuran', $template->ukuran ?? 'a4') === 'a4')>A4</option><option value="thermal58" @selected(old('ukuran', $template->ukuran ?? '') === 'thermal58')>Thermal 58mm</option><option value="thermal80" @selected(old('ukuran', $template->ukuran ?? '') === 'thermal80')>Thermal 80mm</option></select><x-input-error :messages="$errors->get('ukuran')" class="mt-2" /></div><div class="md:col-span-2"><label for="header_text" class="block text-sm font-medium text-slate-700">Header Struk</label><textarea id="header_text" name="header_text" rows="5" class="mt-2 block w-full rounded-xl border-slate-200 font-mono text-sm focus:border-blue-500 focus:ring-blue-500">{{ old('header_text', $template->header_text ?? "BUKTI PEMBAYARAN\n{{ school_name }}\n{{ school_address }}") }}</textarea><x-input-error :messages="$errors->get('header_text')" class="mt-2" /></div><div class="md:col-span-2"><label for="footer_text" class="block text-sm font-medium text-slate-700">Footer Struk</label><textarea id="footer_text" name="footer_text" rows="4" class="mt-2 block w-full rounded-xl border-slate-200 font-mono text-sm focus:border-blue-500 focus:ring-blue-500">{{ old('footer_text', $template->footer_text ?? "Terima kasih atas pembayaran Anda.\nDitandatangani oleh: {{ petugas }}") }}</textarea><x-input-error :messages="$errors->get('footer_text')" class="mt-2" /></div><div class="flex flex-col gap-3"><label class="flex items-center gap-3"><input type="checkbox" name="show_logo" value="1" @checked(old('show_logo', $template->show_logo ?? true)) class="rounded border-slate-300 text-blue-600"><span class="text-sm text-slate-700">Tampilkan logo</span></label><label class="flex items-center gap-3"><input type="checkbox" name="show_qr" value="1" @checked(old('show_qr', $template->show_qr ?? false)) class="rounded border-slate-300 text-blue-600"><span class="text-sm text-slate-700">Tampilkan QR</span></label><label class="flex items-center gap-3"><input type="checkbox" name="aktif" value="1" @checked(old('aktif', $template->aktif ?? true)) class="rounded border-slate-300 text-blue-600"><span class="text-sm text-slate-700">Template aktif</span></label></div><div class="rounded-xl bg-blue-50 p-4 text-xs text-blue-800"><strong>Placeholder:</strong><br><code>{{ '{{ school_name }}' }}</code>, <code>{{ '{{ student_name }}' }}</code>, <code>{{ '{{ student_nis }}' }}</code>, <code>{{ '{{ student_class }}' }}</code>, <code>{{ '{{ payment_type }}' }}</code>, <code>{{ '{{ amount }}' }}</code>, <code>{{ '{{ payment_date }}' }}</code>, <code>{{ '{{ nomor_transaksi }}' }}</code>, <code>{{ '{{ petugas }}' }}</code></div></div>
-    <div class="flex justify-end gap-3 border-t border-slate-100 pt-6"><a href="{{ route('receipt-templates.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600">Batal</a><button class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">{{ $submitLabel }}</button></div>
+@php
+    $isEdit = $isEdit ?? false;
+    $namaTemplate = old('nama_template', $template->nama_template ?? 'Template Default A4');
+    $ukuran = old('ukuran', $template->ukuran ?? 'a4');
+    $headerText = old('header_text', $template->header_text ?? "BUKTI PEMBAYARAN\n{{ school_name }}\n{{ school_address }}");
+    $footerText = old('footer_text', $template->footer_text ?? "Terima kasih atas pembayaran Anda.\nDitandatangani oleh: {{ petugas }}");
+    $showLogo = (bool) old('show_logo', $template->show_logo ?? true);
+    $showQr = (bool) old('show_qr', $template->show_qr ?? false);
+    $aktif = (bool) old('aktif', $template->aktif ?? true);
+@endphp
+
+<form method="POST" action="{{ $formAction }}" class="space-y-8">
+    @csrf
+    @if ($isEdit)
+        @method('PUT')
+    @endif
+
+    <div class="grid gap-6 md:grid-cols-2">
+        <div>
+            <label for="nama_template" class="block text-sm font-medium text-slate-700">Nama Template <span class="text-red-500">*</span></label>
+            <input id="nama_template" name="nama_template" value="{{ $namaTemplate }}" maxlength="100" required class="mt-2 block w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500">
+            <x-input-error :messages="$errors->get('nama_template')" class="mt-2" />
+        </div>
+
+        <div>
+            <label for="ukuran" class="block text-sm font-medium text-slate-700">Ukuran <span class="text-red-500">*</span></label>
+            <select id="ukuran" name="ukuran" required class="mt-2 block w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500">
+                <option value="a4" @selected($ukuran === 'a4')>A4</option>
+                <option value="thermal58" @selected($ukuran === 'thermal58')>Thermal 58mm</option>
+                <option value="thermal80" @selected($ukuran === 'thermal80')>Thermal 80mm</option>
+            </select>
+            <x-input-error :messages="$errors->get('ukuran')" class="mt-2" />
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="header_text" class="block text-sm font-medium text-slate-700">Header Struk</label>
+            <textarea id="header_text" name="header_text" rows="5" class="mt-2 block w-full rounded-xl border-slate-200 font-mono text-sm focus:border-blue-500 focus:ring-blue-500">{{ $headerText }}</textarea>
+            <x-input-error :messages="$errors->get('header_text')" class="mt-2" />
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="footer_text" class="block text-sm font-medium text-slate-700">Footer Struk</label>
+            <textarea id="footer_text" name="footer_text" rows="4" class="mt-2 block w-full rounded-xl border-slate-200 font-mono text-sm focus:border-blue-500 focus:ring-blue-500">{{ $footerText }}</textarea>
+            <x-input-error :messages="$errors->get('footer_text')" class="mt-2" />
+        </div>
+
+        <div class="flex flex-col gap-3">
+            <label class="flex items-center gap-3">
+                <input type="checkbox" name="show_logo" value="1" @checked($showLogo) class="rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Tampilkan logo</span>
+            </label>
+            <label class="flex items-center gap-3">
+                <input type="checkbox" name="show_qr" value="1" @checked($showQr) class="rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Tampilkan QR</span>
+            </label>
+            <label class="flex items-center gap-3">
+                <input type="checkbox" name="aktif" value="1" @checked($aktif) class="rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Template aktif</span>
+            </label>
+        </div>
+
+        <div class="rounded-xl bg-blue-50 p-4 text-xs text-blue-800">
+            <strong>Placeholder:</strong><br>
+            <code>@{{ school_name }}</code>,
+            <code>@{{ student_name }}</code>,
+            <code>@{{ student_nis }}</code>,
+            <code>@{{ student_class }}</code>,
+            <code>@{{ payment_type }}</code>,
+            <code>@{{ amount }}</code>,
+            <code>@{{ payment_date }}</code>,
+            <code>@{{ nomor_transaksi }}</code>,
+            <code>@{{ petugas }}</code>
+        </div>
+    </div>
+
+    <div class="flex justify-end gap-3 border-t border-slate-100 pt-6">
+        <a href="{{ route('receipt-templates.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600">Batal</a>
+        <button class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">{{ $submitLabel }}</button>
+    </div>
 </form>
